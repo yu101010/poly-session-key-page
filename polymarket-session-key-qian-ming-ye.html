@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>Polymarket Session Key 签名页</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #f2f4f1;
+        --surface: #ffffff;
+        --surface-2: #eef1ee;
+        --ink: #16211b;
+        --muted: #5a6a60;
+        --line: #d9e0da;
+        --accent: #0a6b4a;
+        --accent-strong: #085c3f;
+        --accent-ink: #ffffff;
+        --ok: #0a6b4a;
+        --warn-bg: #fdf6e0;
+        --warn-line: #d9a92f;
+        --warn-ink: #6b5410;
+        --danger-bg: #fdecea;
+        --danger-line: #d66a63;
+        --danger-ink: #8f1d17;
+        --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1311;
+          --surface: #171e1a;
+          --surface-2: #1f2923;
+          --ink: #e9efeb;
+          --muted: #a3b5aa;
+          --line: #2c3831;
+          --accent: #2fbf8f;
+          --accent-strong: #57d3a6;
+          --accent-ink: #06231a;
+          --ok: #57d3a6;
+          --warn-bg: #2c2510;
+          --warn-line: #a9832a;
+          --warn-ink: #ecd28a;
+          --danger-bg: #331714;
+          --danger-line: #a34a44;
+          --danger-ink: #f2a49e;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 20px 16px 48px;
+      }
+      h1 {
+        font-size: 24px;
+        line-height: 1.3;
+        margin: 4px 0 8px;
+        letter-spacing: 0;
+      }
+      .lede { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
+      .lede strong { color: var(--ink); }
+
+      .banner {
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 14px;
+        margin: 0 0 14px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .banner.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+      .banner.danger { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger-ink); }
+      .banner.ok { border-color: var(--accent); }
+      .banner p { margin: 0; }
+      .banner p + p { margin-top: 6px; }
+      .hidden { display: none !important; }
+
+      section.step {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px 16px;
+        margin: 0 0 14px;
+      }
+      .step-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .step-num {
+        flex: 0 0 auto;
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 700;
+        margin-top: 2px;
+      }
+      .step.done .step-num { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+      .step.error .step-num { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger-ink); }
+      h2 { font-size: 18px; margin: 0; line-height: 1.4; }
+      .step-status { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+      .step.done .step-status { color: var(--ok); }
+      .step.error .step-status { color: var(--danger-ink); }
+      .step-body { margin-top: 10px; }
+      .hint { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+      .hint code, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+
+      label.field { display: block; margin: 0 0 14px; }
+      label.field:last-child { margin-bottom: 0; }
+      .field-name { display: block; font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+      .field-help { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+      input[type="text"] {
+        width: 100%;
+        min-height: 48px;
+        padding: 10px 12px;
+        font-size: 15px;
+        font-family: var(--mono);
+        color: var(--ink);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        outline: none;
+      }
+      input[type="text"]:focus { border-color: var(--accent); }
+      input[type="text"].invalid { border-color: var(--danger-line); }
+      .field-error { display: none; font-size: 13px; color: var(--danger-ink); margin-top: 4px; }
+      .field-error.show { display: block; }
+
+      button {
+        min-height: 48px;
+        padding: 10px 18px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 10px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+        cursor: pointer;
+        width: 100%;
+      }
+      button:active { background: var(--accent-strong); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.secondary {
+        background: transparent;
+        color: var(--accent);
+        border-color: var(--line);
+      }
+      button.secondary:active { background: var(--surface-2); }
+      button.small { min-height: 44px; width: auto; font-size: 14px; padding: 8px 14px; }
+      .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .btn-row button { flex: 1 1 160px; }
+
+      .addr-box {
+        background: var(--surface-2);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 10px;
+      }
+      .addr-box .addr-label { font-size: 13px; color: var(--muted); }
+      .addr-box .addr-value { font-family: var(--mono); font-size: 13px; word-break: break-all; }
+
+      .log {
+        margin: 12px 0 0;
+        padding: 10px 12px;
+        background: var(--surface-2);
+        border-radius: 10px;
+        font-size: 13px;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+      .log:empty { display: none; }
+      .log div { padding: 2px 0; border-bottom: 1px dashed var(--line); }
+      .log div:last-child { border-bottom: none; }
+      .log .t { color: var(--muted); font-family: var(--mono); font-size: 11.5px; margin-right: 6px; }
+      .log .err { color: var(--danger-ink); }
+      .log .good { color: var(--ok); }
+
+      .cred-row {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        margin: 0 0 10px;
+        background: var(--surface);
+      }
+      .cred-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .cred-name { font-family: var(--mono); font-size: 13px; font-weight: 700; word-break: break-all; }
+      .cred-value { font-family: var(--mono); font-size: 12.5px; word-break: break-all; margin-top: 6px; color: var(--ink); }
+      .copy-btn { flex: 0 0 auto; width: auto; min-height: 44px; padding: 8px 16px; font-size: 14px; }
+
+      .safety { font-size: 14px; color: var(--muted); }
+      .safety li { margin-bottom: 6px; }
+      footer { font-size: 13px; color: var(--muted); margin-top: 20px; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Polymarket Session Key 授权</h1>
+      <p class="lede">
+        在手机上给交易机器人生成一把 <strong>Session Key（会话密钥）</strong>：它只能下单交易、<strong>不能提款</strong>，
+        有效期约 180 天，随时可在 Polymarket 里撤销。全程只需要你在 OKX 钱包里<strong>点一次签名</strong>，其余步骤本页自动完成。
+      </p>
+
+      <div class="banner warn" role="alert">
+        <p><strong>先看这一条：</strong>本页不保存任何东西，<strong>刷新或关掉页面，所有内容立即清空</strong>，生成的密钥无法找回。最后一步拿到 5 个值后，请先全部复制保存好，再关闭页面。</p>
+      </div>
+
+      <div id="env-error" class="banner danger hidden" role="alert"></div>
+      <div id="skew-warn" class="banner warn hidden" role="alert"></div>
+
+      <!-- 步骤 1 -->
+      <section class="step" id="step1">
+        <div class="step-head">
+          <div class="step-num">1</div>
+          <div>
+            <h2>连接 OKX 钱包</h2>
+            <p class="step-status" data-status>未连接</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <button id="btn-connect" type="button">连接钱包</button>
+          <div id="owner-box" class="addr-box hidden">
+            <div class="addr-label">你的钱包地址（Owner）</div>
+            <div class="addr-value" id="owner-addr"></div>
+            <div class="addr-label" style="margin-top:6px;">当前网络</div>
+            <div class="addr-value" id="chain-info"></div>
+          </div>
+          <button id="btn-switch" type="button" class="secondary hidden" style="margin-top:10px;">切换到 Polygon 网络</button>
+          <p class="hint">授权需要在 Polygon 网络（chainId 137）上签名。如果网络不对，点上面的按钮切换，钱包会弹窗让你确认。</p>
+        </div>
+      </section>
+
+      <!-- 步骤 2 -->
+      <section class="step" id="step2">
+        <div class="step-head">
+          <div class="step-num">2</div>
+          <div>
+            <h2>填入 Polymarket 的信息</h2>
+            <p class="step-status" data-status>等待填写</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <label class="field">
+            <span class="field-name">Deposit Wallet 地址</span>
+            <span class="field-help">你的 Polymarket 存款钱包地址，就是你充值 USDC 的那个 Polymarket 账户地址（0x 开头，共 42 位）。</span>
+            <input type="text" id="in-deposit" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="0x…" />
+            <span class="field-error" data-err>地址格式不对：应为 0x 开头 + 40 位十六进制字符。</span>
+          </label>
+          <label class="field">
+            <span class="field-name">Relayer API Key</span>
+            <span class="field-help">在 Polymarket 网页版：Settings → API Keys → Relayer API Keys 里创建/查看。</span>
+            <input type="text" id="in-relayer-key" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="粘贴 Relayer API Key" />
+            <span class="field-error" data-err>请填入 Relayer API Key。</span>
+          </label>
+          <label class="field">
+            <span class="field-name">Relayer Key 绑定的地址</span>
+            <span class="field-help">同一页面里，这把 Relayer Key 旁边显示的地址（0x 开头，共 42 位）。</span>
+            <input type="text" id="in-relayer-addr" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="0x…" />
+            <span class="field-error" data-err>地址格式不对：应为 0x 开头 + 40 位十六进制字符。</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- 步骤 3 -->
+      <section class="step" id="step3">
+        <div class="step-head">
+          <div class="step-num">3</div>
+          <div>
+            <h2>生成 Session Key</h2>
+            <p class="step-status" data-status>未生成</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <button id="btn-gen" type="button">生成新的 Session Key</button>
+          <div id="session-box" class="addr-box hidden">
+            <div class="addr-label">Session Key 地址（将要被授权的地址）</div>
+            <div class="addr-value" id="session-addr"></div>
+          </div>
+          <p class="hint">密钥在本页内随机生成，私钥只存在于本页内存中，不会上传到任何地方。重复点生成会换一把新密钥，之前生成的即作废。</p>
+        </div>
+      </section>
+
+      <!-- 步骤 4 -->
+      <section class="step" id="step4">
+        <div class="step-head">
+          <div class="step-num">4</div>
+          <div>
+            <h2>授权 Session Key（点一次签名）</h2>
+            <p class="step-status" data-status>未授权</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <button id="btn-authorize" type="button">开始授权（钱包会弹出签名）</button>
+          <p class="hint">点下后流程是：向 Polymarket 读取 nonce → OKX 钱包弹出一次签名（签的是“授权这把 Session Key 约 180 天、仅 CLOB 交易权限”）→ 自动提交并等待链上确认。签名不花钱、不转币。</p>
+          <div id="tx-box" class="addr-box hidden">
+            <div class="addr-label">链上交易哈希</div>
+            <div class="addr-value" id="tx-hash"></div>
+          </div>
+          <div class="log" id="auth-log" aria-live="polite"></div>
+          <div style="margin-top:12px;">
+            <button id="btn-verify" type="button" class="secondary" disabled>验证授权是否生效（可选）</button>
+            <p class="hint">验证需要钱包再签一次名（ClobAuth），然后向 Polymarket 查询这把 Session Key 是否已在册。一般授权确认成功就够了，不验证也可以。</p>
+            <div class="log" id="verify-log" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 步骤 5 -->
+      <section class="step" id="step5">
+        <div class="step-head">
+          <div class="step-num">5</div>
+          <div>
+            <h2>生成 L2 凭据</h2>
+            <p class="step-status" data-status>未生成</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <button id="btn-derive" type="button" disabled>用 Session Key 生成 L2 凭据</button>
+          <p class="hint">这一步用 Session Key 在本页本地签名，不需要再点钱包。完成后下方会出现机器人需要的全部 5 个值。</p>
+          <div class="log" id="derive-log" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- 结果 -->
+      <section class="step hidden" id="result">
+        <div class="step-head">
+          <div class="step-num">✓</div>
+          <div>
+            <h2>全部完成 — 请立即保存这 5 个值</h2>
+            <p class="step-status" data-status>授权 + L2 凭据已就绪</p>
+          </div>
+        </div>
+        <div class="step-body">
+          <div class="banner warn">
+            <p><strong>关掉或刷新本页，这些值就永远消失了。</strong>请逐个复制，保存到运行交易机器人的那台机器上（例如阿里云 ECS 的环境变量里）。</p>
+            <p><strong>千万不要把这些值粘贴到聊天里发给任何人</strong>，包括发给我。谁拿到 Session 私钥 + L2 凭据，谁就能用你的账户下单交易。</p>
+          </div>
+          <div id="cred-list"></div>
+          <button id="btn-copy-all" type="button" class="secondary">复制全部（.env 格式）</button>
+          <div class="addr-box">
+            <div class="addr-label">Session Key 到期时间（约 180 天）</div>
+            <div class="addr-value" id="expiry-info"></div>
+            <div class="hint" style="margin-top:6px;">到期后机器人将无法下单，需要重新走一遍本页流程。想提前停用，在 Polymarket 设置里 revoke（撤销）这把 Session Key 即可；它能交易、不能提款。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="step">
+        <div class="step-head">
+          <div class="step-num">i</div>
+          <div>
+            <h2>安全说明</h2>
+            <p class="step-status">密钥不出手机</p>
+          </div>
+        </div>
+        <div class="step-body safety">
+          <ul style="margin:0; padding-left:20px;">
+            <li>Session 私钥在你的手机上、本页内生成，只用于在本页本地签名，<strong>从不发送到任何服务器</strong>——发出去的只有签名结果。</li>
+            <li>你的钱包主私钥从头到尾不离开 OKX 钱包，本页只能请钱包弹窗签名，读不到它。</li>
+            <li>Relayer API Key 只会发送给 Polymarket 官方的 <span class="mono">relayer-v2.polymarket.com</span>；L2 凭据只向官方 <span class="mono">clob.polymarket.com</span> 申请。本页不连接任何其他服务器（仅从 CDN 加载 ethers.js 库）。</li>
+            <li>本页不使用任何本地存储：不写 Cookie、不写 localStorage，刷新即清空。</li>
+            <li>Session Key 权限仅限 CLOB 交易，不能提款、不能转账；万一泄露，损失上限是被乱下单，请第一时间在 Polymarket 里撤销它。</li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>
+        遇到报错先看红色提示里的说明；最常见的是网络不是 Polygon、地址填错、或手机时间不准（时间偏差过大时签名会过期，请把手机时间设为自动同步）。
+      </footer>
+    </main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var RELAYER_BASE = "https://relayer-v2.polymarket.com";
+        var CLOB_BASE = "https://clob.polymarket.com";
+        var CHAIN_ID = 137;
+        var VALID_SECONDS = 15534000; // 约 180 天
+        var DEADLINE_SECONDS = 600;
+
+        // ---------- 状态（只存在于内存） ----------
+        var rawProvider = null;
+        var browserProvider = null;
+        var signer = null;
+        var ownerAddress = null;
+        var chainOk = false;
+        var sessionWallet = null;
+        var sessionAddress = null;
+        var validUntil = null;
+        var authorized = false;
+        var sessionL2 = null; // {apiKey, secret, passphrase}
+
+        // ---------- DOM ----------
+        function $(id) { return document.getElementById(id); }
+        var envError = $("env-error");
+
+        function showEnvError(html) {
+          envError.innerHTML = html;
+          envError.classList.remove("hidden");
+        }
+        function setStatus(stepId, state, text) {
+          var sec = $(stepId);
+          sec.classList.remove("done", "error");
+          if (state) sec.classList.add(state);
+          var el = sec.querySelector("[data-status]");
+          if (el && text) el.textContent = text;
+        }
+        function timeStr() {
+          var d = new Date();
+          function p(n) { return (n < 10 ? "0" : "") + n; }
+          return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+        }
+        function logTo(el, msg, cls) {
+          var div = document.createElement("div");
+          if (cls) div.className = cls;
+          var t = document.createElement("span");
+          t.className = "t";
+          t.textContent = timeStr();
+          div.appendChild(t);
+          div.appendChild(document.createTextNode(msg));
+          el.appendChild(div);
+          el.scrollTop = el.scrollHeight;
+        }
+        function nowSec() { return Math.floor(Date.now() / 1000); }
+        function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+        function uuid4() {
+          if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+          return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+            var r = (Math.random() * 16) | 0;
+            var v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        }
+        function isAddr(s) { return /^0x[0-9a-fA-F]{40}$/.test((s || "").trim()); }
+        function checksum(s) { return ethers.getAddress((s || "").trim()); }
+        function friendlyErr(e) {
+          if (!e) return "未知错误";
+          var m = e.shortMessage || e.message || String(e);
+          if (/user rejected|denied|rejected the request/i.test(m)) return "你在钱包里取消了签名/操作，可以重新点按钮再试。";
+          if (/Failed to fetch|NetworkError|network/i.test(m)) return "网络请求失败，请检查手机网络后重试。（" + m + "）";
+          return m;
+        }
+
+        // ---------- 环境检查 ----------
+        function getRawProvider() {
+          if (window.okxwallet && window.okxwallet.ethereum) return window.okxwallet.ethereum;
+          if (window.ethereum) return window.ethereum;
+          return null;
+        }
+        function checkEnv() {
+          if (typeof ethers === "undefined") {
+            showEnvError("<p><strong>组件加载失败：</strong>ethers.js 库没能从 CDN 加载进来，请检查网络后刷新页面重试。</p>");
+            return false;
+          }
+          rawProvider = getRawProvider();
+          if (!rawProvider) {
+            showEnvError(
+              "<p><strong>没有检测到钱包。</strong>这个页面必须在 <strong>OKX 钱包 App 的内置浏览器</strong>里打开才能签名。</p>" +
+              "<p>打开方式：打开 OKX App → 底部「发现」/浏览器 → 把本页地址粘贴进去打开。不要用微信、Safari 或普通浏览器打开。</p>"
+            );
+            $("btn-connect").disabled = true;
+            return false;
+          }
+          return true;
+        }
+
+        // ---------- 步骤 1：连接钱包 ----------
+        function refreshChain() {
+          return rawProvider.request({ method: "eth_chainId" }).then(function (hex) {
+            var id = parseInt(hex, 16);
+            chainOk = id === CHAIN_ID;
+            $("chain-info").textContent = chainOk
+              ? "Polygon（chainId 137）✓"
+              : "当前 chainId " + id + "，不是 Polygon（需要 137）";
+            $("btn-switch").classList.toggle("hidden", chainOk);
+            if (ownerAddress) {
+              setStatus("step1", chainOk ? "done" : "error",
+                chainOk ? "已连接，网络正确" : "已连接，但网络不对，请切换到 Polygon");
+            }
+            updateAuthorizeReady();
+            return id;
+          });
+        }
+
+        $("btn-connect").addEventListener("click", function () {
+          if (!checkEnv()) return;
+          var btn = $("btn-connect");
+          btn.disabled = true;
+          btn.textContent = "连接中…";
+          rawProvider.request({ method: "eth_requestAccounts" })
+            .then(function (accounts) {
+              if (!accounts || !accounts.length) throw new Error("钱包没有返回账户地址，请在 OKX 里解锁钱包后重试。");
+              browserProvider = new ethers.BrowserProvider(rawProvider);
+              return browserProvider.getSigner();
+            })
+            .then(function (sg) {
+              signer = sg;
+              return signer.getAddress();
+            })
+            .then(function (addr) {
+              ownerAddress = checksum(addr);
+              $("owner-addr").textContent = ownerAddress;
+              $("owner-box").classList.remove("hidden");
+              btn.textContent = "已连接 ✓（点此重新连接）";
+              btn.disabled = false;
+              return refreshChain();
+            })
+            .catch(function (e) {
+              btn.disabled = false;
+              btn.textContent = "连接钱包";
+              setStatus("step1", "error", "连接失败");
+              showEnvError("<p><strong>连接钱包失败：</strong>" + friendlyErr(e) + "</p>");
+            });
+        });
+
+        $("btn-switch").addEventListener("click", function () {
+          if (!rawProvider) return;
+          rawProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x89" }]
+          }).then(function () {
+            return refreshChain();
+          }).catch(function (e) {
+            showEnvError("<p><strong>切换网络失败：</strong>" + friendlyErr(e) + " 也可以在 OKX 钱包里手动把网络切到 Polygon 后回到本页。</p>");
+          });
+        });
+
+        if (window.ethereum || (window.okxwallet && window.okxwallet.ethereum)) {
+          var rp = getRawProvider();
+          if (rp && rp.on) {
+            rp.on("chainChanged", function () { if (ownerAddress) refreshChain(); });
+            rp.on("accountsChanged", function () {
+              // 账户变了，旧的签名者作废，要求重新连接
+              ownerAddress = null; signer = null; authorized = false;
+              $("owner-box").classList.add("hidden");
+              setStatus("step1", "", "钱包账户已变化，请重新连接");
+              $("btn-connect").textContent = "连接钱包";
+              updateAuthorizeReady();
+            });
+          }
+        }
+
+        // ---------- 步骤 2：输入校验 ----------
+        function fieldState(input) {
+          var wrap = input.closest("label.field");
+          var err = wrap.querySelector("[data-err]");
+          return { wrap: wrap, err: err };
+        }
+        function validateField(input, ok) {
+          var st = fieldState(input);
+          input.classList.toggle("invalid", !ok);
+          st.err.classList.toggle("show", !ok);
+          return ok;
+        }
+        function depositVal() { return $("in-deposit").value.trim(); }
+        function relayerKeyVal() { return $("in-relayer-key").value.trim(); }
+        function relayerAddrVal() { return $("in-relayer-addr").value.trim(); }
+        function validateInputs(showErrors) {
+          var d = isAddr(depositVal());
+          var k = relayerKeyVal().length > 0;
+          var a = isAddr(relayerAddrVal());
+          if (showErrors) {
+            validateField($("in-deposit"), d);
+            validateField($("in-relayer-key"), k);
+            validateField($("in-relayer-addr"), a);
+          }
+          var all = d && k && a;
+          setStatus("step2", all ? "done" : "", all ? "三项已填写，格式正确" : "等待填写完整");
+          return all;
+        }
+        ["in-deposit", "in-relayer-key", "in-relayer-addr"].forEach(function (id) {
+          $(id).addEventListener("input", function () { validateInputs(false); updateAuthorizeReady(); });
+          $(id).addEventListener("blur", function () { validateInputs(true); });
+        });
+
+        // ---------- 步骤 3：生成 Session Key ----------
+        $("btn-gen").addEventListener("click", function () {
+          if (typeof ethers === "undefined") { showEnvError("<p><strong>ethers.js 未加载</strong>，请刷新页面重试。</p>"); return; }
+          sessionWallet = ethers.Wallet.createRandom();
+          sessionAddress = sessionWallet.address;
+          authorized = false;
+          sessionL2 = null;
+          $("session-addr").textContent = sessionAddress;
+          $("session-box").classList.remove("hidden");
+          setStatus("step3", "done", "已生成：" + sessionAddress.slice(0, 10) + "…" + sessionAddress.slice(-6));
+          setStatus("step4", "", "未授权");
+          setStatus("step5", "", "未生成");
+          $("btn-verify").disabled = true;
+          $("btn-derive").disabled = true;
+          $("result").classList.add("hidden");
+          updateAuthorizeReady();
+        });
+
+        function updateAuthorizeReady() {
+          // 授权按钮不硬禁用（点后会给出明确报错），这里只更新步骤2状态提示
+        }
+
+        // ---------- Relayer 请求 ----------
+        function relayerHeaders(extra) {
+          var h = {
+            "RELAYER_API_KEY": relayerKeyVal(),
+            "RELAYER_API_KEY_ADDRESS": checksum(relayerAddrVal())
+          };
+          if (extra) { for (var k in extra) h[k] = extra[k]; }
+          return h;
+        }
+        function checkTimeSkew(resp) {
+          var dateHeader = resp.headers.get("Date");
+          if (!dateHeader) return;
+          var serverMs = new Date(dateHeader).getTime();
+          if (isNaN(serverMs)) return;
+          var skewSec = Math.abs(Date.now() - serverMs) / 1000;
+          var box = $("skew-warn");
+          if (skewSec > 30) {
+            box.innerHTML = "<p><strong>手机时间偏差过大：</strong>与 Polymarket 服务器相差约 " + Math.round(skewSec) + " 秒。签名可能因此过期失败，请到手机设置里把日期与时间设为「自动同步」，然后回到本页重试。</p>";
+            box.classList.remove("hidden");
+          } else {
+            box.classList.add("hidden");
+          }
+        }
+        function fetchNonce(logEl) {
+          var url = RELAYER_BASE + "/v1/account/transactions/params?address=" + encodeURIComponent(ownerAddress) + "&type=WALLET";
+          return fetch(url, { method: "GET", headers: relayerHeaders() }).then(function (resp) {
+            checkTimeSkew(resp);
+            return resp.text().then(function (text) {
+              if (!resp.ok) throw new Error("读取 nonce 失败（HTTP " + resp.status + "）：" + text);
+              var json;
+              try { json = JSON.parse(text); } catch (e) { throw new Error("读取 nonce 失败：服务器返回了无法解析的内容。"); }
+              var nonce = json.nonce != null ? json.nonce
+                : (json.data && json.data.nonce != null ? json.data.nonce
+                : (json.params && json.params.nonce != null ? json.params.nonce : null));
+              if (nonce == null || !/^\d+$/.test(String(nonce))) {
+                throw new Error("服务器返回里没有找到合法的 nonce，原文：" + text.slice(0, 200));
+              }
+              return String(nonce);
+            });
+          });
+        }
+        function buildAuthPayload(nonceStr) {
+          validUntil = nowSec() + VALID_SECONDS;
+          var deadline = nowSec() + DEADLINE_SECONDS;
+          var deposit = checksum(depositVal());
+          var coder = ethers.AbiCoder.defaultAbiCoder();
+          var encoded = coder.encode(["address", "uint256"], [sessionAddress, validUntil]);
+          var calldata = "0x24017fae" + encoded.slice(2);
+          var domain = { name: "DepositWallet", version: "1", chainId: CHAIN_ID, verifyingContract: deposit };
+          var types = {
+            Batch: [
+              { name: "wallet", type: "address" },
+              { name: "nonce", type: "uint256" },
+              { name: "deadline", type: "uint256" },
+              { name: "calls", type: "Call[]" }
+            ],
+            Call: [
+              { name: "target", type: "address" },
+              { name: "value", type: "uint256" },
+              { name: "data", type: "bytes" }
+            ]
+          };
+          var message = {
+            wallet: deposit,
+            nonce: BigInt(nonceStr),
+            deadline: BigInt(deadline),
+            calls: [{ target: deposit, value: 0n, data: calldata }]
+          };
+          return signer.signTypedData(domain, types, message).then(function (signature) {
+            return {
+              signature: signature,
+              body: {
+                deadline: String(deadline),
+                nonce: nonceStr,
+                scopes: ["CLOB"],
+                sessionSignerAddress: checksum(sessionAddress),
+                signature: signature,
+                validUntil: String(validUntil),
+                walletAddress: deposit
+              }
+            };
+          });
+        }
+        function postAuthorization(body) {
+          return fetch(RELAYER_BASE + "/v1/session-signers/authorizations", {
+            method: "POST",
+            headers: relayerHeaders({ "Idempotency-Key": uuid4(), "Content-Type": "application/json" }),
+            body: JSON.stringify(body)
+          }).then(function (resp) {
+            return resp.text().then(function (text) {
+              return { status: resp.status, ok: resp.ok, text: text };
+            });
+          });
+        }
+        function pollTransaction(txId, logEl) {
+          var tries = 0;
+          function once() {
+            tries++;
+            return fetch(RELAYER_BASE + "/v1/account/transactions/" + encodeURIComponent(txId), {
+              method: "GET",
+              headers: relayerHeaders()
+            }).then(function (resp) {
+              return resp.text().then(function (text) {
+                if (!resp.ok) throw new Error("查询交易状态失败（HTTP " + resp.status + "）：" + text);
+                var json;
+                try { json = JSON.parse(text); } catch (e) { throw new Error("查询交易状态失败：返回内容无法解析。"); }
+                var data = json.data && typeof json.data === "object" ? json.data : json;
+                var state = data.state || data.status || "";
+                var hash = data.transaction_hash || data.transactionHash || data.txHash || data.hash || null;
+                var errMsg = data.error_msg || data.errorMsg || data.error || "";
+                if (state === "STATE_CONFIRMED" && hash) return hash;
+                if (state === "STATE_FAILED" || state === "STATE_INVALID") {
+                  throw new Error("授权交易失败" + (errMsg ? "：" + errMsg : "（状态 " + state + "）"));
+                }
+                if (tries >= 100) throw new Error("等待链上确认超时（已等约 200 秒）。请稍后点「验证授权是否生效」确认结果，不要重复授权。");
+                logTo(logEl, "等待链上确认…（第 " + tries + " 次查询，当前状态：" + (state || "处理中") + "）");
+                return sleep(2000).then(once);
+              });
+            });
+          }
+          return sleep(2000).then(once);
+        }
+
+        // ---------- 步骤 4：授权 ----------
+        $("btn-authorize").addEventListener("click", function () {
+          var logEl = $("auth-log");
+          logEl.innerHTML = "";
+          var btn = $("btn-authorize");
+          // 前置检查
+          if (!ownerAddress || !signer) { logTo(logEl, "请先完成第 1 步：连接钱包。", "err"); setStatus("step4", "error", "还没连接钱包"); return; }
+          if (!chainOk) { logTo(logEl, "当前网络不是 Polygon，请先点第 1 步里的「切换到 Polygon 网络」。", "err"); setStatus("step4", "error", "网络不对"); return; }
+          if (!validateInputs(true)) { logTo(logEl, "第 2 步有内容没填对，请检查红色提示。", "err"); setStatus("step4", "error", "信息不完整"); return; }
+          if (!sessionWallet) { logTo(logEl, "请先完成第 3 步：生成 Session Key。", "err"); setStatus("step4", "error", "还没生成 Session Key"); return; }
+
+          btn.disabled = true;
+          btn.textContent = "授权进行中…";
+          setStatus("step4", "", "授权进行中…");
+
+          var attempt = function (isRetry) {
+            logTo(logEl, isRetry ? "nonce 已变化，重新读取并重新签名…" : "正在向 Polymarket 读取 nonce…");
+            return fetchNonce(logEl).then(function (nonceStr) {
+              logTo(logEl, "已取得 nonce。接下来 OKX 钱包会弹出签名确认，请点确认（全程只有这一次）。");
+              return buildAuthPayload(nonceStr);
+            }).then(function (payload) {
+              logTo(logEl, "签名完成，正在提交授权…");
+              return postAuthorization(payload.body).then(function (res) {
+                if (!res.ok) {
+                  if (res.status === 400 && /nonce/i.test(res.text) && !isRetry) {
+                    logTo(logEl, "服务器提示 nonce 不匹配，自动重试一次。");
+                    return attempt(true);
+                  }
+                  throw new Error("提交授权失败（HTTP " + res.status + "）：" + res.text);
+                }
+                var json;
+                try { json = JSON.parse(res.text); } catch (e) { throw new Error("提交授权失败：服务器返回内容无法解析。"); }
+                var data = json.data && typeof json.data === "object" ? json.data : json;
+                var txId = data.transactionId || data.transaction_id || data.id || null;
+                if (!txId) throw new Error("提交成功但服务器没返回交易 ID，原文：" + res.text.slice(0, 200));
+                logTo(logEl, "已提交，交易 ID：" + txId + "，等待链上确认…");
+                return pollTransaction(txId, logEl);
+              });
+            });
+          };
+
+          attempt(false).then(function (hash) {
+            authorized = true;
+            $("tx-hash").textContent = hash;
+            $("tx-box").classList.remove("hidden");
+            logTo(logEl, "授权已链上确认 ✓ 交易哈希：" + hash, "good");
+            setStatus("step4", "done", "授权成功，已链上确认");
+            $("btn-verify").disabled = false;
+            $("btn-derive").disabled = false;
+            btn.textContent = "已授权 ✓";
+          }).catch(function (e) {
+            logTo(logEl, "授权失败：" + friendlyErr(e), "err");
+            setStatus("step4", "error", "授权失败，看下方日志");
+            btn.disabled = false;
+            btn.textContent = "重新开始授权（钱包会弹出签名）";
+          });
+        });
+
+        // ---------- ClobAuth 签名 + L2 凭据派生 ----------
+        function clobAuthSign(signFn, address) {
+          var ts = String(nowSec());
+          var domain = { name: "ClobAuthDomain", version: "1", chainId: CHAIN_ID };
+          var types = {
+            ClobAuth: [
+              { name: "address", type: "address" },
+              { name: "timestamp", type: "string" },
+              { name: "nonce", type: "uint256" },
+              { name: "message", type: "string" }
+            ]
+          };
+          var message = {
+            address: checksum(address),
+            timestamp: ts,
+            nonce: 0,
+            message: "This message attests that I control the given wallet"
+          };
+          return Promise.resolve(signFn(domain, types, message)).then(function (sig) {
+            return { signature: sig, timestamp: ts };
+          });
+        }
+        function deriveApiKey(signFn, address) {
+          return clobAuthSign(signFn, address).then(function (s) {
+            var headers = {
+              "POLY_ADDRESS": checksum(address),
+              "POLY_NONCE": "0",
+              "POLY_SIGNATURE": s.signature,
+              "POLY_TIMESTAMP": s.timestamp
+            };
+            return fetch(CLOB_BASE + "/auth/api-key", { method: "POST", headers: headers }).then(function (resp) {
+              if (resp.status === 400) {
+                // 已存在则改为派生已有凭据
+                return fetch(CLOB_BASE + "/auth/derive-api-key", { method: "GET", headers: headers });
+              }
+              return resp;
+            }).then(function (resp) {
+              return resp.text().then(function (text) {
+                if (!resp.ok) throw new Error("获取 L2 凭据失败（HTTP " + resp.status + "）：" + text);
+                var json;
+                try { json = JSON.parse(text); } catch (e) { throw new Error("获取 L2 凭据失败：返回内容无法解析。"); }
+                var apiKey = json.apiKey || json.api_key;
+                var secret = json.secret;
+                var passphrase = json.passphrase;
+                if (!apiKey || !secret || !passphrase) throw new Error("服务器返回的 L2 凭据不完整，原文：" + text.slice(0, 200));
+                return { apiKey: apiKey, secret: secret, passphrase: passphrase };
+              });
+            });
+          });
+        }
+
+        // ---------- 步骤 4g：验证（可选） ----------
+        function base64UrlToBytes(b64url) {
+          var b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+          while (b64.length % 4) b64 += "=";
+          var bin = atob(b64);
+          var bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          return bytes;
+        }
+        function bytesToBase64Url(bytes) {
+          var bin = "";
+          bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+          return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_");
+        }
+        function hmacSha256Base64Url(secret, message) {
+          var keyBytes = base64UrlToBytes(secret);
+          var msgBytes = new TextEncoder().encode(message);
+          return crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+            .then(function (key) { return crypto.subtle.sign("HMAC", key, msgBytes); })
+            .then(function (sig) { return bytesToBase64Url(new Uint8Array(sig)); });
+        }
+
+        $("btn-verify").addEventListener("click", function () {
+          var logEl = $("verify-log");
+          logEl.innerHTML = "";
+          var btn = $("btn-verify");
+          if (!ownerAddress || !signer) { logTo(logEl, "请先连接钱包。", "err"); return; }
+          if (!sessionAddress || validUntil == null) { logTo(logEl, "还没有可验证的授权记录，请先完成授权。", "err"); return; }
+          btn.disabled = true;
+          btn.textContent = "验证中…";
+          logTo(logEl, "正在用钱包签 ClobAuth 并换取你的 L2 凭据（钱包会弹窗）…");
+          deriveApiKey(function (d, t, m) { return signer.signTypedData(d, t, m); }, ownerAddress)
+            .then(function (ownerL2) {
+              var path = "/v1/user/session-signers";
+              var ts = String(nowSec());
+              var msg = ts + "GET" + path;
+              return hmacSha256Base64Url(ownerL2.secret, msg).then(function (sig) {
+                var headers = {
+                  "POLY_ADDRESS": ownerAddress,
+                  "POLY_API_KEY": ownerL2.apiKey,
+                  "POLY_PASSPHRASE": ownerL2.passphrase,
+                  "POLY_TIMESTAMP": ts,
+                  "POLY_SIGNATURE": sig
+                };
+                logTo(logEl, "正在向 Polymarket 查询已授权的 Session Key 列表…");
+                return fetch(CLOB_BASE + path, { method: "GET", headers: headers });
+              });
+            })
+            .then(function (resp) {
+              return resp.text().then(function (text) {
+                if (!resp.ok) throw new Error("查询失败（HTTP " + resp.status + "）：" + text);
+                var json;
+                try { json = JSON.parse(text); } catch (e) { throw new Error("查询结果无法解析。"); }
+                var list = Array.isArray(json) ? json : (json.data || json.signers || json.sessionSigners || []);
+                var found = null;
+                for (var i = 0; i < list.length; i++) {
+                  var e = list[i];
+                  var addr = e.signerAddress || e.sessionSignerAddress || e.session_signer_address || e.address || "";
+                  if (addr.toLowerCase() === sessionAddress.toLowerCase()) { found = e; break; }
+                }
+                if (!found) {
+                  logTo(logEl, "查询完成，但列表里还没有这把 Session Key。链上刚确认时可能有几分钟延迟，稍后再验证一次。", "err");
+                  return;
+                }
+                var vu = found.validUntil != null ? Number(found.validUntil) : (found.valid_until != null ? Number(found.valid_until) : null);
+                var scopes = found.scopes || found.scope || [];
+                var scopeOk = Array.isArray(scopes) && scopes.length === 1 && scopes[0] === "CLOB";
+                if (vu === Number(validUntil) && scopeOk) {
+                  logTo(logEl, "验证通过 ✓ 这把 Session Key 已在册，到期时间与权限（CLOB）都对得上。", "good");
+                } else {
+                  logTo(logEl, "找到了这把 Session Key，但信息不完全一致（到期：" + vu + "，权限：" + JSON.stringify(scopes) + "）。请把这个情况告诉协助你的人。", "err");
+                }
+              });
+            })
+            .catch(function (e) {
+              logTo(logEl, "验证失败：" + friendlyErr(e), "err");
+            })
+            .finally(function () {
+              btn.disabled = false;
+              btn.textContent = "验证授权是否生效（可选）";
+            });
+        });
+
+        // ---------- 步骤 5：派生 Session L2 凭据 ----------
+        $("btn-derive").addEventListener("click", function () {
+          var logEl = $("derive-log");
+          logEl.innerHTML = "";
+          var btn = $("btn-derive");
+          if (!sessionWallet) { logTo(logEl, "请先生成 Session Key。", "err"); return; }
+          if (!authorized) { logTo(logEl, "请先完成第 4 步授权，确认成功后再来生成 L2 凭据。", "err"); return; }
+          btn.disabled = true;
+          btn.textContent = "生成中…";
+          logTo(logEl, "正在用 Session Key 本地签名并向 Polymarket 申请 L2 凭据…");
+          deriveApiKey(function (d, t, m) { return sessionWallet.signTypedData(d, t, m); }, sessionAddress)
+            .then(function (l2) {
+              sessionL2 = l2;
+              logTo(logEl, "L2 凭据已生成 ✓ 请看下方结果区，立即复制保存。", "good");
+              setStatus("step5", "done", "L2 凭据已生成");
+              btn.textContent = "已生成 ✓";
+              renderResult();
+            })
+            .catch(function (e) {
+              logTo(logEl, "生成失败：" + friendlyErr(e), "err");
+              setStatus("step5", "error", "生成失败，看下方日志");
+              btn.disabled = false;
+              btn.textContent = "重新生成 L2 凭据";
+            });
+        });
+
+        // ---------- 结果区 ----------
+        function copyText(text, btn) {
+          function done() {
+            if (btn) {
+              var old = btn.textContent;
+              btn.textContent = "已复制 ✓";
+              setTimeout(function () { btn.textContent = old; }, 1800);
+            }
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(function () { fallback(); });
+          } else { fallback(); }
+          function fallback() {
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand("copy"); done(); } catch (e) { /* 忽略，用户可长按手动复制 */ }
+            document.body.removeChild(ta);
+          }
+        }
+        function renderResult() {
+          var deposit = checksum(depositVal());
+          var creds = [
+            { name: "POLY_SESSION_PRIVATE_KEY", value: sessionWallet.privateKey },
+            { name: "POLY_L2_API_KEY", value: sessionL2.apiKey },
+            { name: "POLY_L2_API_SECRET", value: sessionL2.secret },
+            { name: "POLY_L2_API_PASSPHRASE", value: sessionL2.passphrase },
+            { name: "POLY_WALLET_ADDRESS", value: deposit }
+          ];
+          var list = $("cred-list");
+          list.innerHTML = "";
+          creds.forEach(function (c) {
+            var row = document.createElement("div");
+            row.className = "cred-row";
+            var head = document.createElement("div");
+            head.className = "cred-head";
+            var name = document.createElement("span");
+            name.className = "cred-name";
+            name.textContent = c.name;
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "copy-btn";
+            btn.textContent = "复制";
+            btn.addEventListener("click", function () { copyText(c.value, btn); });
+            head.appendChild(name);
+            head.appendChild(btn);
+            var val = document.createElement("div");
+            val.className = "cred-value";
+            val.textContent = c.value;
+            row.appendChild(head);
+            row.appendChild(val);
+            list.appendChild(row);
+          });
+          var exp = new Date(validUntil * 1000);
+          $("expiry-info").textContent = exp.toLocaleString("zh-CN", { hour12: false }) + "（约 180 天后）";
+          $("result").classList.remove("hidden");
+          $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+          $("btn-copy-all").onclick = function () {
+            var text = creds.map(function (c) { return c.name + "=" + c.value; }).join("\n");
+            copyText(text, $("btn-copy-all"));
+          };
+        }
+
+        // 初始化
+        checkEnv();
+      })();
+    </script>
+  </body>
+</html>
